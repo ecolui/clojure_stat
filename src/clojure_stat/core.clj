@@ -82,3 +82,19 @@
     )
   )
 
+(defn percentile [pct & data]
+  (let [total-records (count data)
+        sorted-data (sort data)
+        adj-pct (cond (<= pct 0) 0.01 
+                      (and (>= pct 1) (<= pct 100)) (/ pct 100)
+                      (> pct 100) 1
+                      :else pct
+                )
+       ]
+       (cond
+        (= total-records 0) nil
+        (= total-records 1) (first data)
+        :else (nth sorted-data (dec (int (Math/ceil (* total-records adj-pct)))))
+         )
+       )
+  )
