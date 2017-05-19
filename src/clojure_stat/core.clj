@@ -1,6 +1,6 @@
 (ns clojure-stat.core)
 
-(defn verify-stats-input-for-summarize [stats]
+(defn- verify-stats-input-for-summarize [stats]
   "This is a private helper function for the summarize macro.
    If data has three elements and the first element is not a vector, then wrap the three elements in a vector,
    and nest that vector in another vector. Otherwise, return the stats vector as is.
@@ -49,13 +49,18 @@
       )
    )
    ([data stats]
-    `(let [
-           verified-stats# (verify-stats-input-for-summarize ~stats)
-           stats# (reduce (fn [result# [item# fn# name#]] (conj result# (keyword name#) (apply fn# (map item# ~data)))) [] verified-stats#)
-           ]
-       (apply hash-map stats#)
+     (do 
+       ;;verify-stats-input-for-summarize is a private function, so you should'nt put it in the s-expression,
+       ;;since it will likely get macroexpanded in a different namespace.
+       (let [verified-stats (verify-stats-input-for-summarize stats)]
+        `(let [
+              stats# (reduce (fn [result# [item# fn# name#]] (conj result# (keyword name#) (apply fn# (map item# ~data)))) [] ~verified-stats)
+              ]
+          (apply hash-map stats#)
+          )
        )
      )
+    )
   )
 
 (defn mean [& data]
