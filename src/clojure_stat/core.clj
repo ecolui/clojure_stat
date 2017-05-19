@@ -1,6 +1,6 @@
 (ns clojure-stat.core)
 
-(defn- verify-stats-input-for-summarize [stats]
+(defn verify-stats-input-for-summarize [stats]
   "This is a private helper function for the summarize macro.
    If data has three elements and the first element is not a vector, then wrap the three elements in a vector,
    and nest that vector in another vector. Otherwise, return the stats vector as is.
@@ -11,7 +11,7 @@
     )
   )
 
-(defmacro ^{:private true} summarize
+(defmacro summarize
   "Takes a vector of maps (data), a vector of keys (groups), and a vector of statistics (stats).  The function applies the summary stats in (stats) to
    each partition that is created from the keys in (groups).
    Sample data and macro call proceed:
