@@ -1,20 +1,7 @@
 (ns clojure-stat.core)
 
-(defn- verify-stats-input-for-summarize [stats]
-  "This is a private helper function for the summarize macro.
-   If data has three elements and the first element is not a vector, then wrap the three elements in a vector,
-   and nest that vector in another vector. Otherwise, return the stats vector as is.
-  "
-  (cond
-    (and (= (count stats) 3) (not (vector? (first stats)))) (vector stats)
-    :else stats 
-    )
-  )
-
-(defmacro summarize
-  "Takes a vector of maps (data), a vector of keys (groups), and a vector of statistics (stats).  The function applies the summary stats in (stats) to
-   each partition that is created from the keys in (groups).
-   Sample data and macro call proceed:
+(defn summarize-by-group [data group & stats]
+"Generates partitioned summary statistics for a collection of maps. Sample proceeds:
    (def sample_data [
           {:dt 20110331 :name \"John\" :age 22 :salary 65000 :education 12}
           {:dt 20120331 :name \"John\" :age 23 :salary 65000 :education 12}
@@ -23,45 +10,42 @@
           {:dt 20110331 :name \"Eric\" :age 22 :salary 25000 :education 12}
           {:dt 20120331 :name \"Eric\" :age 23 :salary 25000 :education 12}
           ])
-   The following will summarize the data by :dt and :education. The macro will apply the mean function to :salary and 
-   place the result in a key named avg_salary.  The macro will apply the + function to :salary and place the result
-   in a key named aggregate_income
-   (summarize sample_data [:dt :education] [[:salary mean \"avg_salary\"] [:salary + \"aggregate_income\"]])
-   other examples:   
-   (summarize sample_data [:education :age] [[:salary + \"aggregate_income\"]])
-   (summarize sample_data [:education :age] [:salary + \"aggregate_income\"])
-   (summarize sample_data [[:salary + \"aggregate_income\"]])
-   (summarize sample_data [:salary + \"aggregate_income\"])
-  "
-  ([data group stats]
-   `(let [sorted-data# (sort-by (juxt ~@group) ~data)
-          partitioned-data# (partition-by #(apply vector (map (fn [attr#] (attr# %)) ~group)) sorted-data#)]
-      (map
-       (fn [partition#]
-         (let [first_record# (first partition#)
-               grouping# (reduce (fn [result# obs#] (assoc result# obs# (obs# first_record#))) {} ~group)
-               stats# (clojure-stat.core/summarize partition# ~stats)]
-           (merge grouping# stats#)
-           )
-        )
-       partitioned-data#
-       )
-      )
-   )
-   ([data stats]
-     (do 
-       ;;verify-stats-input-for-summarize is a private function, so you should'nt put it in the s-expression,
-       ;;since it will likely get macroexpanded in a different namespace.
-       (let [verified-stats (verify-stats-input-for-summarize stats)]
-        `(let [
-              stats# (reduce (fn [result# [item# fn# name#]] (conj result# (keyword name#) (apply fn# (map item# ~data)))) [] ~verified-stats)
+  (summarize-by-group sample_data [:education :age] [:salary + \"aggregateIincome\"])
+  (summarize-by-group sample_data [:age] [:salary + \"aggregateIncome\"] [:education mean \"avgEducation\"])
+  (summarize-by-group sample_data :age [:salary + \"aggregateIncome\"] [:education mean \"avgEducation\"])
+  (summarize sample_data [:salary + \"aggregate_income\"])
+  (summarize sample_data [:salary + \"aggregate_income\"] [:education mean \"avgEducation\"])
+"
+  (let [group (if (vector? group) group [group])
+        sorted-data (sort-by (apply juxt group) data)
+        partitioned-data (partition-by 
+                           (fn [data] (select-keys data group)) 
+                           sorted-data)]
+    (map
+      (fn [partition]
+        (let [grouping-data (reduce 
+                              (fn [result obs] 
+                                (assoc result obs 
+                                       (obs (first partition)))) 
+                              {} 
+                              group)
+              summarize-fn (partial summarize partition)
+              statistics (apply summarize-fn stats)              
               ]
-          (apply hash-map stats#)
+          (merge grouping-data statistics)
           )
-       )
-     )
+        )
+      partitioned-data
+      )    
     )
   )
+
+(defn summarize [data & stats]
+    (let [reducer-fn (fn [result [keywd stat-fn name]] (conj result (keyword name) (apply stat-fn (map keywd data))))
+          stat-results (reduce reducer-fn [] stats)]
+      (apply hash-map stat-results)        
+      )    
+  
 
 (defn mean [& data]
   "Takes a sequence of numbers and returns the mean. Sample uses are (mean 1 2 3 4) and (apply mean [1 2 3 4])."
